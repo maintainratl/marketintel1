@@ -310,50 +310,13 @@ export default function Dashboard() {
   // ── News ─────────────────────────────────────────────────────────────────
   const fetchNews = useCallback(async () => {
     setNewsLoading(true);
-    let raw = [];
     try {
       const r = await fetch('/api/news');
       const d = await r.json();
-      raw = d.headlines || [];
-    } catch (_) {}
-    if (!raw.length) { setNewsLoading(false); return; }
-    try {
-      const list = raw.slice(0, 50).map((h, i) => `${i+1}. [${h.source}] ${h.title}`).join("\n");
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1500,
-          messages: [{ role: "user", content: `You are a financial market intelligence AI. A trader holds: ${ASSET_STR}. They also closely watch the SpaceX IPO.
-
-Pick the 8 most relevant headlines below for their portfolio. Always include SpaceX IPO news if present.
-
-${list}
-
-Reply ONLY with a JSON array, no markdown:
-[{"headline":"...","summary":"2 sentences on portfolio impact","assets":["SYM"],"sentiment":"bullish|bearish|neutral","topic":"US Politics & Policy|Global Conflicts & Geopolitics|Fed Rates & Inflation|Crypto Regulation & Tech|Reddit Sentiment|Stock News|SpaceX IPO Watch","source":"...","idx":1}]` }],
-        }),
-      });
-      const data = await res.json();
-      const text = (data.content?.[0]?.text || "[]").replace(/```json|```/g,"").trim();
-      const parsed = JSON.parse(text);
-      setNews(parsed.map(item => ({ ...item, url: raw[item.idx-1]?.url, time: raw[item.idx-1]?.time })));
+      setNews(d.news || []);
     } catch (_) {}
     setNewsLoading(false);
   }, []);
-
-  useEffect(() => { fetchNews(); }, []);
-
-  // ── Drag & Drop ──────────────────────────────────────────────────────────
-  const onDragStart = (i, list) => { dragItem.current = i; dragList.current = list; };
-  const onDragEnter = (i) => { dragOver.current = i; };
-  const onDragEnd = () => {
-    if (dragItem.current === null || dragOver.current === null || dragItem.current === dragOver.current) { dragItem.current = dragOver.current = null; return; }
-    const setter = dragList.current === "watch" ? setWatchlist : setPortfolio;
-    setter(prev => { const n = [...prev]; n.splice(dragOver.current, 0, n.splice(dragItem.current, 1)[0]); return n; });
-    dragItem.current = dragOver.current = dragList.current = null;
-  };
 
   // ── Watchlist add/remove ─────────────────────────────────────────────────
   const addWatch = useCallback(async () => {
