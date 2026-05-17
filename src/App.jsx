@@ -339,7 +339,14 @@ export default function Dashboard() {
   }, [watchInput, watchlist]);
 
   const removeWatch = useCallback((sym) => setWatchlist(prev => prev.filter(a => a.symbol !== sym)), []);
-
+const onDragStart = (i, list) => { dragItem.current = i; dragList.current = list; };
+  const onDragEnter = (i) => { dragOver.current = i; };
+  const onDragEnd = () => {
+    if (dragItem.current === null || dragOver.current === null || dragItem.current === dragOver.current) { dragItem.current = dragOver.current = null; return; }
+    const setter = dragList.current === "watch" ? setWatchlist : setPortfolio;
+    setter(prev => { const n = [...prev]; n.splice(dragOver.current, 0, n.splice(dragItem.current, 1)[0]); return n; });
+    dragItem.current = dragOver.current = dragList.current = null;
+  };
   // ── Derived ──────────────────────────────────────────────────────────────
   const FILTERS = ["ALL","crypto","stock","commodity","watchlist"];
   const visible = filter === "watchlist" ? watchlist : filter === "ALL" ? portfolio : portfolio.filter(a => a.type === filter);
