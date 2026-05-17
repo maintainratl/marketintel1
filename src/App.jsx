@@ -259,29 +259,16 @@ export default function Dashboard() {
   // ── Prices ──────────────────────────────────────────────────────────────
   const fetchPrices = useCallback(async () => {
     try {
-      const cgIds = CRYPTO.map(a => a.cgId).join(",");
-      const cgRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgIds}&vs_currencies=usd&include_24hr_change=true`);
-      const cgData = await cgRes.json();
-      const next = {};
-      for (const a of CRYPTO) {
-        const d = cgData[a.cgId];
-        if (d) next[a.symbol] = { cur: d.usd, prev: d.usd / (1 + (d.usd_24h_change||0)/100), pct24: d.usd_24h_change||0 };
-      }
-      await Promise.all([...STOCKS, ...INIT_WATCHLIST.filter(a => !a.preIpo)].map(async a => {
-        try {
-          const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${a.symbol}&token=${FINNHUB_KEY}`);
-          const d = await r.json();
-          if (d?.c) next[a.symbol] = { cur: d.c, prev: d.pc||d.c, pct24: d.pc ? ((d.c-d.pc)/d.pc)*100 : 0 };
-        } catch (_) {}
-      }));
+      const r = await fetch('/api/prices');
+      const d = await r.json();
       setPrices(prev => {
         const fl = {};
-        for (const s of Object.keys(next)) {
-          if (prev[s]) fl[s] = next[s].cur >= prev[s].cur ? "up" : "dn";
+        for (const s of Object.keys(d.prices)) {
+          if (prev[s]) fl[s] = d.prices[s].cur >= prev[s].cur ? "up" : "dn";
         }
         setFlash(fl);
         setTimeout(() => setFlash({}), 800);
-        return { ...prev, ...next };
+        return { ...prev, ...d.prices };
       });
       setLastTick(new Date());
     } catch (_) {}
@@ -323,30 +310,12 @@ export default function Dashboard() {
   // ── News ─────────────────────────────────────────────────────────────────
   const fetchNews = useCallback(async () => {
     setNewsLoading(true);
-    const raw = [];
+    let raw = [];
     try {
-      const r = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${FINNHUB_KEY}`);
+      const r = await fetch('/api/news');
       const d = await r.json();
-      (Array.isArray(d) ? d : []).slice(0, 20).forEach(i => raw.push({ title: i.headline, source: "Finnhub", url: i.url, time: i.datetime }));
+      raw = d.headlines || [];
     } catch (_) {}
-    try {
-      const q = encodeURIComponent("stocks OR crypto OR bitcoin OR fed OR inflation OR SpaceX IPO");
-      const r = await fetch(`https://newsapi.org/v2/everything?q=${q}&language=en&sortBy=publishedAt&pageSize=20&apiKey=${NEWSAPI_KEY}`);
-      const d = await r.json();
-      (d.articles||[]).forEach(a => raw.push({ title: a.title, source: a.source?.name||"NewsAPI", url: a.url, time: null }));
-    } catch (_) {}
-    const feeds = [
-      { url: "https://www.reddit.com/r/wallstreetbets/new.json?limit=8", label: "WSB" },
-      { url: "https://www.reddit.com/r/CryptoCurrency/new.json?limit=8", label: "r/Crypto" },
-      { url: "https://www.reddit.com/r/stocks/new.json?limit=6", label: "r/Stocks" },
-    ];
-    for (const feed of feeds) {
-      try {
-        const r = await fetch(feed.url, { headers: { "User-Agent": "MarketIntel/1.0" } });
-        const d = await r.json();
-        (d?.data?.children||[]).forEach(({ data: p }) => raw.push({ title: p.title, source: `Reddit/${feed.label}`, url: `https://reddit.com${p.permalink}`, time: p.created_utc }));
-      } catch (_) {}
-    }
     if (!raw.length) { setNewsLoading(false); return; }
     try {
       const list = raw.slice(0, 50).map((h, i) => `${i+1}. [${h.source}] ${h.title}`).join("\n");
