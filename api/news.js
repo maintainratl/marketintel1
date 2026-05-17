@@ -64,6 +64,7 @@ Reply ONLY with a JSON array, no markdown:
       })
     });
     const aiData = await aiRes.json();
+    console.log('AI Data:', JSON.stringify(aiData));
     const text = (aiData.content?.[0]?.text || '[]').replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(text);
     const news = parsed.map(item => ({
@@ -71,8 +72,8 @@ Reply ONLY with a JSON array, no markdown:
       url: raw[item.idx - 1]?.url,
       time: raw[item.idx - 1]?.time
     }));
-    return res.status(200).json({ news });
-  } catch (_) {
-    return res.status(200).json({ news: [] });
+    return res.status(200).json({ news, debug: { headlines: raw.length, aiRaw: aiData } });
+  } catch (e) {
+    return res.status(200).json({ news: [], error: e.message });
   }
 }
